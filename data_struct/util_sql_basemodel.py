@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field, fields
 from typing import Any, Dict, List, Type, TypeVar 
+from sqlalchemy.sql import text
 
 T = TypeVar('T', bound='BaseModel')
 
@@ -23,30 +24,21 @@ class BaseModel:
     def get_table_name(cls) -> str:
         """テーブル名を取得"""
         return cls.__name__.lower()
-    
+
     @classmethod
     def get_columns(cls) -> Dict[str, Dict[str, Any]]:
-        """
-        フィールド情報を取得し、カラムの構造を定義
-        Returns:
-            {フィールド名: {型情報、メタ情報}}
-        """
+        """カラムの構造を取得"""
         columns = {}
         for field_info in fields(cls):
-            col_name = field_info.name
-            col_type = field_info.type
-            metadata = field_info.metadata
-            columns[col_name] = {
-                "type": col_type,
-                "metadata": metadata,
+            columns[field_info.name] = {
+                "type": field_info.type,
+                "metadata": field_info.metadata,
             }
         return columns
 
     @classmethod
     def get_primary_keys(cls) -> List[str]:
-        """
-        プライマリキーとして指定されたフィールド名を取得
-        """
+        """プライマリキーを取得"""
         return [
             field_info.name
             for field_info in fields(cls)
@@ -55,12 +47,40 @@ class BaseModel:
 
     @classmethod
     def from_dict(cls: Type[T], data: Dict[str, Any]) -> T:
-        """
-        辞書からモデルインスタンスを生成
-        """
+        """辞書からモデルインスタンスを生成"""
         return cls(**data)
 
-    def to_dict(self) -> Dict[str, Any]:
-        """インスタンスの辞書化"""
-        return {k: v for k, v in self.__dict__.items()}
-    
+    def to_dict(self, exclude_none: bool = False) -> Dict[str, Any]:
+        """インスタンスの辞書化（Noneを除外可能）"""
+        if exclude_none:
+            return {k: v for k, v in self.__dict__.items() if v is not None}
+        return self.__dict__.copy()
+
+    def generate_insert_sql(self) -> str:
+        """INSERT文の生成（安全なSQLAlchemy構文）"""
+        data = self.to_dict()
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join(f":{key}" for key in data.keys())
+        return str(text(f"INSERT INTO {self.get_table_name()} ({columns}) VALUES ({placeholders})"))
+
+    def generate_update_sql(self) -> str:
+        """UPDATE文の生成（プライマリキー必須）"""
+        data = self.to_dict()
+        primary_keys = self.get_primary_keys()
+        if not primary_keys:
+            raise ValueError(f"{self.__class__.__name__} にはプライマリキーが定義されていません。")
+
+        columns = ", ".join(f"{key} = :{key}" for key in data.keys() if key not in primary_keys)
+        where_clause = " AND ".join(f"{pk} = :{pk}" for pk in primary_keys)
+
+        return str(text(f"UPDATE {self.get_table_name()} SET {columns} WHERE {where_clause}"))
+
+    def generate_delete_sql(self) -> str:
+        """DELETE文の生成（プライマリキー必須）"""
+        primary_keys = self.get_primary_keys()
+        if not primary_keys:
+            raise ValueError(f"{self.__class__.__name__} にはプライマリキーが定義されていません。")
+
+        where_clause = " AND ".join(f"{pk} = :{pk}" for pk in primary_keys)
+
+        return str(text(f"DELETE FROM {self.get_table_name()} WHERE {where_clause}"))
