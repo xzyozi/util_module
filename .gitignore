@@ -1,0 +1,5 @@
+db_manager/__pycache__/
+test.db
+test_sql.py
+data_struct/util_csv_mng.py
+db_manager/memo.txt
