@@ -20,7 +20,11 @@ def print_tree(dir_path: str, prefix: str = ""):
         if (Config.SHOW_HIDDEN or not e.name.startswith('.'))
         and (e.is_dir() and e.name not in Config.EXCLUDE_DIRS or e.is_file() and e.name not in Config.EXCLUDE_FILES)
     ]
-    entries.sort(key=lambda e: e.name)
+
+    # ディレクトリ→ファイルの順に並べ替え（名前順）
+    dirs = sorted([e for e in entries if e.is_dir()], key=lambda e: e.name)
+    files = sorted([e for e in entries if e.is_file()], key=lambda e: e.name)
+    entries = dirs + files
 
     for index, entry in enumerate(entries):
         connector = "└─ " if index == len(entries) - 1 else "├─ "
