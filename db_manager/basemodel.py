@@ -31,11 +31,18 @@ class BaseModel(Base):
     
     @classmethod
     def get_columns(cls) -> Dict[str, Dict[str, Any]]:
+        if not hasattr(cls, "__table__"):
+            return {}
         return {c.name: {"type": str(c.type), "primary_key": c.primary_key} for c in cls.__table__.columns}
 
     @classmethod
     def get_primary_keys(cls) -> List[str]:
+        if not hasattr(cls, "__table__"):
+            return []
         return [c.name for c in cls.__table__.columns if c.primary_key]
 
     def to_dict(self) -> Dict[str, Any]:
+        if not hasattr(self, "__table__"):
+            return {}
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
