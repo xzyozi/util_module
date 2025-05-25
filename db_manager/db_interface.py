@@ -1,4 +1,6 @@
 import logging
+from contextlib import contextmanager
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError, OperationalError
@@ -19,7 +21,6 @@ class DBInterface:
         データベースの接続を初期化
         :param db_url: 接続先のデータベースURL (例: "sqlite:///test.db")
         """
-    def __init__(self, db_url: str):
         try:
             self.engine = create_engine(db_url)
             self.Session = sessionmaker(bind=self.engine)
@@ -28,9 +29,18 @@ class DBInterface:
             logger.error("DB 接続失敗: %s", e)
             raise
 
-    def get_session(self):
-        """新しいセッションを取得"""
-        return self.Session()
+    @contextmanager
+    def session_scope(self):
+        """with 文で使えるセッションスコープ"""
+        session = self.Session()
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
     def create_tables(self, base):
         """テーブル作成"""
